@@ -3,7 +3,7 @@
 多源数据智能路由器 - A股交易数据获取
 =========================================
 版本: v3.0 (2026-05-22)
-Skill: wolfjkd-trader-data
+Skill: trader-data-router
 作者: wolfjkd (MIT License)
 
 数据源自动检测、评分、择优，支持并行探测和结果对比。

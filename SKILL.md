@@ -1,5 +1,5 @@
 # A股数据获取体系 - 快速部署指南
-> **Skill名称**：wolfjkd-trader-data
+> **Skill名称**：trader-data-router
 > **当前版本**：**v3.0**（2026-05-22）
 > **作者**：wolfjkd
 > **开源协议**：MIT

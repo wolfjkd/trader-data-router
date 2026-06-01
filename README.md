@@ -1,4 +1,4 @@
-# wolfjkd-trader-data
+# trader-data-router
 
 <p align="center">
   <strong>A股数据获取体系 + 多源智能路由</strong><br>
@@ -9,7 +9,7 @@
 
 ## ✨ 这是什么？
 
-**wolfjkd-trader-data** 是一个面向A股交易员的完整数据获取解决方案，核心亮点：
+**trader-data-router** 是一个面向A股交易员的完整数据获取解决方案，核心亮点：
 
 | 能力 | 说明 |
 |------|------|
@@ -32,8 +32,8 @@
 ### 1. 下载
 
 ```bash
-git clone https://github.com/wolfjkd/wolfjkd-trader-data.git
-cd wolfjkd-trader-data
+git clone https://github.com/wolfjkd/trader-data-router.git
+cd trader-data-router
 ```
 
 ### 2. 健康检测
@@ -166,9 +166,9 @@ npx openclaw skills install shawn92/ftshare-announcement-data
 将整个目录放到你的skills文件夹：
 
 ```bash
-cp -r wolfjkd-trader-data ~/.workbuddy/skills/
+cp -r trader-data-router ~/.workbuddy/skills/
 # 或
-cp -r wolfjkd-trader-data ~/.openclaw/workspace/skills/
+cp -r trader-data-router ~/.openclaw/workspace/skills/
 ```
 
 ## 使用场景
