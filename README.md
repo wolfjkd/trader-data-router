@@ -227,6 +227,7 @@ for stock in data['data']:
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v3.1 | 2026-06-01 | 更名 trader-data-router；东财适配器重构（datacenter端点，4/4可用）；集成全市场分析引擎（NewsFetcher+THSDataFetcher+MarketModels）；联动 trader-finance-hub 开源项目 |
 | v3.0 | 2026-05-22 | 新增 data_router.py 多源智能路由 |
 | v2.0 | 2026-05-22 | 整合Wind万得金融8大能力 |
 | v1.0 | 2026-05-20 | 初始版：腾讯+ftshare+AkShare体系 |
