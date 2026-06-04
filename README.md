@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A股数据获取体系 + 多源智能路由</strong><br>
-  <i>零依赖 · 自动故障切换 · 开箱即用</i>
+  <i>零依赖 · 自动故障切换 · 开箱即用 · 独有数据源</i>
 </p>
 
 ---
@@ -13,16 +13,17 @@
 
 | 能力 | 说明 |
 |------|------|
-| 📊 **5大数据源** | 腾讯实时行情、ftshare公告、Wind深度数据、AkShare、WebSearch |
+| 📊 **6大数据源** | 腾讯实时行情、ftshare公告、Wind深度数据、东方财富、eltdx通达信、WebSearch |
 | 🔄 **智能路由** | `data_router.py` — 自动探测所有数据源健康状态，评分择优 |
-| ⚡ **毫秒级响应** | 腾讯行情接口 <200ms，并行多线程探测 |
+| ⚡ **毫秒级响应** | 腾讯行情接口 <200ms，eltdx本地协议 <150ms |
 | 🔌 **零依赖** | data_router.py 仅用Python标准库，无需pip install任何包 |
 | 🛡️ **自动容错** | 某个源挂了自动切到下一个，报告标注来源和评分 |
+| 🎯 **独有数据** | eltdx提供集合竞价、逐笔成交、F10资料等腾讯接口无此功能 |
 
 ### 核心架构
 
 ```
-请求 → 并行探测(腾讯 + Wind + ftshare) → 评分排序 → 选最优
+请求 → 并行探测(腾讯 + Wind + ftshare + 东财 + eltdx) → 评分排序 → 主力源优先 → 选最优
                                               ↓
                                     某源挂了？自动降级到备选
 ```
@@ -227,6 +228,9 @@ for stock in data['data']:
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v3.3.1 | 2026-06-04 | eltdx路由修复：竞争性数据类型优先主力源（腾讯），独有数据类型固定高分；更新SKILL.md文档 |
+| v3.3 | 2026-06-04 | 新增eltdx通达信行情协议适配器（集合竞价/逐笔成交/F10资料/分时数据）；更新评分模型 |
+| v3.2 | 2026-06-01 | 更名 trader-data-router；东财适配器重构（datacenter端点，4/4可用）；集成全市场分析引擎（NewsFetcher+THSDataFetcher+MarketModels）；联动 trader-finance-hub 开源项目 |
 | v3.1 | 2026-06-01 | 更名 trader-data-router；东财适配器重构（datacenter端点，4/4可用）；集成全市场分析引擎（NewsFetcher+THSDataFetcher+MarketModels）；联动 trader-finance-hub 开源项目 |
 | v3.0 | 2026-05-22 | 新增 data_router.py 多源智能路由 |
 | v2.0 | 2026-05-22 | 整合Wind万得金融8大能力 |
@@ -242,6 +246,7 @@ MIT License — 自由使用、修改、分发。
 - [Wind万得金融](https://www.wind.com.cn/) — 专业金融数据
 - [ftshare-announcement-data](https://clawhub.ai) — A股公告数据
 - [AkShare](https://akshare.akfamily.xyz/) — Python财经数据接口库
+- [eltdx](https://github.com/electkismet/eltdx/) — 通达信A股行情协议Python库
 
 ---
 
