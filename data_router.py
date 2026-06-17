@@ -2,7 +2,7 @@
 """
 多源数据智能路由器 - A股交易数据获取
 =========================================
-版本: v3.0 (2026-05-22)
+版本: v3.1 (2026-06-17)
 Skill: trader-data-router
 作者: wolfjkd (MIT License)
 
@@ -22,6 +22,13 @@ Skill: trader-data-router
   # 对比多个数据源的同一条数据
   python data_router.py compare --code 600519.SH --type quote
 
+  # eltdx 通达信协议数据（K线/分时/集合竞价/逐笔/F10）
+  python data_router.py kline --code 600519 --period day --count 100
+  python data_router.py minute --code 600519
+  python data_router.py auction --code 600519
+  python data_router.py tick --code 600519 --date 20260617 --count 1000
+  python data_router.py f10 --code 600519
+
   # 仅输出JSON（供其他脚本调用）
   python data_router.py quote --codes sh000001 --json
 """
@@ -29,6 +36,7 @@ Skill: trader-data-router
 import json
 import sys
 import time
+import os
 import urllib.request
 import urllib.error
 import subprocess
@@ -412,6 +420,331 @@ class FtShareAdapter:
         return result
 
 
+class EltdxAdapter:
+    """通达信私有协议适配器（eltdx 1.0.2）
+
+    支持 eltdx 独有数据：K线、分时、集合竞价、逐笔成交、F10、行情快照。
+    不复制 eltdx 源码，仅通过公开 pip 包 import 调用。
+    """
+
+    NAME = "eltdx"
+    DESCRIPTION = "通达信私有协议（eltdx 1.0.2）—— K线/分时/集合竞价/逐笔/F10/快照"
+
+    # 默认通达信节点；可通过环境变量 ELTDX_HOSTS=host1,host2 覆盖
+    DEFAULT_HOSTS = None
+    _client = None
+    _client_lock = False
+
+    @classmethod
+    def _is_available(cls) -> bool:
+        try:
+            import eltdx
+            return True
+        except ImportError:
+            return False
+
+    @classmethod
+    def _get_client(cls):
+        """获取/创建 eltdx Client 单例（不探测 host，首次连接）"""
+        if cls._client is not None:
+            return cls._client
+        if cls._client_lock:
+            return None
+        cls._client_lock = True
+        try:
+            from eltdx import Client
+            hosts_env = os.environ.get("ELTDX_HOSTS")
+            hosts = hosts_env.split(",") if hosts_env else cls.DEFAULT_HOSTS
+            cls._client = Client.from_hosts(
+                hosts, timeout=8.0, pool_size=1, probe_hosts=False
+            )
+            cls._client.connect()
+            return cls._client
+        except Exception as e:
+            cls._client = None
+            return None
+        finally:
+            cls._client_lock = False
+
+    @classmethod
+    def _normalize_code(cls, code: str) -> str:
+        """统一为 eltdx 期望的 sh/sz/bj + 6位代码格式"""
+        code = str(code).strip().lower()
+        if code.startswith(("sz", "sh", "bj")):
+            return code
+        if len(code) == 6 and code.isdigit():
+            if code.startswith(("60", "68", "90", "11", "13")):
+                return "sh" + code
+            if code.startswith(("00", "30", "20")):
+                return "sz" + code
+            if code.startswith(("8", "43", "92")):
+                return "bj" + code
+        return code
+
+    @classmethod
+    def fetch(cls, data_type: str, code: str, **kwargs) -> DataSourceResult:
+        """统一入口：data_type 支持 quote/kline/minute/auction/tick/f10"""
+        result = DataSourceResult("eltdx", data_type)
+        start = time.time()
+
+        if not cls._is_available():
+            result.error = "eltdx 包未安装"
+            result.response_time_ms = round((time.time() - start) * 1000)
+            result.score = 0
+            return result
+
+        client = cls._get_client()
+        if not client:
+            result.error = "eltdx client 初始化失败（通达信节点不可达）"
+            result.response_time_ms = round((time.time() - start) * 1000)
+            result.score = 0
+            return result
+
+        norm_code = cls._normalize_code(code)
+
+        try:
+            if data_type == "quote":
+                result = cls._fetch_quote(client, norm_code, result, start)
+            elif data_type == "kline":
+                result = cls._fetch_kline(client, norm_code, result, start, **kwargs)
+            elif data_type == "minute":
+                result = cls._fetch_minute(client, norm_code, result, start)
+            elif data_type == "auction":
+                result = cls._fetch_auction(client, norm_code, result, start)
+            elif data_type == "tick":
+                result = cls._fetch_tick(client, norm_code, result, start, **kwargs)
+            elif data_type == "f10":
+                result = cls._fetch_f10(client, norm_code, result, start)
+            else:
+                result.error = f"eltdx 不支持的数据类型: {data_type}"
+                result.response_time_ms = round((time.time() - start) * 1000)
+                result.score = 0
+        except Exception as e:
+            result.response_time_ms = round((time.time() - start) * 1000)
+            result.error = str(e)
+            result.score = 0
+
+        return result
+
+    @classmethod
+    def _fetch_quote(cls, client, norm_code: str, result: DataSourceResult, start: float) -> DataSourceResult:
+        resp = client.quotes.get_snapshots([norm_code])
+        result.response_time_ms = round((time.time() - start) * 1000)
+        if not resp:
+            result.error = "无行情数据"
+            result.score = 0
+            return result
+        q = resp[0]
+        result.data = q
+        result.success = True
+        result.parsed = [{
+            "code": q.code,
+            "exchange": q.exchange,
+            "price": q.last_price,
+            "prev_close": q.pre_close_price,
+            "open": q.open_price,
+            "high": q.high_price,
+            "low": q.low_price,
+            "volume": q.total_hand,
+            "amount": q.amount,
+            "change_pct": q.change_pct,
+            "change_amt": q.change,
+            "buy_levels": [
+                {"price": lvl.price, "volume": lvl.volume}
+                for lvl in getattr(q, "buy_levels", [])[:5]
+            ],
+            "sell_levels": [
+                {"price": lvl.price, "volume": lvl.volume}
+                for lvl in getattr(q, "sell_levels", [])[:5]
+            ],
+            "_source": "eltdx",
+        }]
+        return cls._score(result)
+
+    @classmethod
+    def _fetch_kline(cls, client, norm_code: str, result: DataSourceResult, start: float, **kwargs) -> DataSourceResult:
+        period = kwargs.get("period", "day")
+        count = kwargs.get("count", 100)
+        resp = client.bars.get(norm_code, period=period, count=count)
+        result.response_time_ms = round((time.time() - start) * 1000)
+        bars = getattr(resp, "bars", None) or []
+        if not bars:
+            result.error = "无 K 线数据"
+            result.score = 0
+            return result
+        result.data = resp
+        result.success = True
+        result.parsed = {
+            "code": norm_code,
+            "period": period,
+            "bars": [
+                {
+                    "date": getattr(b, "time", None) and getattr(b, "time").strftime("%Y-%m-%d %H:%M:%S") if hasattr(getattr(b, "time", None), "strftime") else getattr(b, "time", None),
+                    "open": getattr(b, "open", None),
+                    "high": getattr(b, "high", None),
+                    "low": getattr(b, "low", None),
+                    "close": getattr(b, "close", None),
+                    "volume": getattr(b, "volume_lots", None) or getattr(b, "volume_raw", None),
+                    "amount": getattr(b, "amount", None),
+                }
+                for b in bars
+            ],
+            "_source": "eltdx",
+        }
+        return cls._score(result)
+
+    @classmethod
+    def _fetch_minute(cls, client, norm_code: str, result: DataSourceResult, start: float) -> DataSourceResult:
+        resp = client.minutes.today(norm_code)
+        result.response_time_ms = round((time.time() - start) * 1000)
+        points = getattr(resp, "points", None) or []
+        if not points:
+            result.error = "无分时数据"
+            result.score = 0
+            return result
+        result.data = resp
+        result.success = True
+        result.parsed = {
+            "code": norm_code,
+            "points": [
+                {
+                    "time": getattr(p, "time_label", None) or getattr(p, "time", None),
+                    "price": getattr(p, "price", None),
+                    "avg_price": getattr(p, "avg_price", None),
+                    "volume": getattr(p, "volume", None),
+                }
+                for p in points
+            ],
+            "_source": "eltdx",
+        }
+        return cls._score(result)
+
+    @classmethod
+    def _fetch_auction(cls, client, norm_code: str, result: DataSourceResult, start: float) -> DataSourceResult:
+        resp = client.auctions.series(norm_code)
+        result.response_time_ms = round((time.time() - start) * 1000)
+        points = getattr(resp, "points", None) or []
+        if not points:
+            result.error = "无集合竞价数据（非竞价时段或数据为空）"
+            result.score = 0
+            return result
+        result.data = resp
+        result.success = True
+        result.parsed = {
+            "code": norm_code,
+            "points": [
+                {
+                    "time": getattr(p, "time_label", None) or getattr(p, "time", None),
+                    "price": getattr(p, "price", None),
+                    "matched_volume": getattr(p, "matched_volume", None),
+                    "unmatched_volume": getattr(p, "unmatched_volume", None),
+                }
+                for p in points
+            ],
+            "_source": "eltdx",
+        }
+        return cls._score(result)
+
+    @classmethod
+    def _fetch_tick(cls, client, norm_code: str, result: DataSourceResult, start: float, **kwargs) -> DataSourceResult:
+        date = kwargs.get("date", datetime.now().strftime("%Y%m%d"))
+        date = str(date).replace("-", "").replace("/", "")
+        count = kwargs.get("count", 2000)
+        resp = client.trades.history(norm_code, date, count=count)
+        result.response_time_ms = round((time.time() - start) * 1000)
+        ticks = getattr(resp, "ticks", None) or []
+        if not ticks:
+            result.error = f"无逐笔成交数据（日期 {date}）"
+            result.score = 0
+            return result
+        result.data = resp
+        result.success = True
+        result.parsed = {
+            "code": norm_code,
+            "date": date,
+            "ticks": [
+                {
+                    "time": getattr(t, "time_label", None) or getattr(t, "trade_datetime", None),
+                    "price": getattr(t, "price", None),
+                    "volume": getattr(t, "volume", None),
+                    "amount": getattr(t, "trade_amount_yuan", None),
+                    "bs": getattr(t, "side", "unknown"),
+                }
+                for t in ticks
+            ],
+            "_source": "eltdx",
+        }
+        return cls._score(result)
+
+    @classmethod
+    def _fetch_f10(cls, client, norm_code: str, result: DataSourceResult, start: float) -> DataSourceResult:
+        code6 = norm_code[2:] if norm_code.startswith(("sh", "sz", "bj")) else norm_code
+        profile_resp = client.f10.company_profile(code6)
+        topics_resp = client.f10.hot_topics(code6)
+        diag_resp = client.f10.finance_diagnosis(code6)
+        result.response_time_ms = round((time.time() - start) * 1000)
+
+        def _rows(resp):
+            if resp is None or not getattr(resp, "ok", False):
+                return []
+            table = getattr(resp, "first_table", None)
+            return list(table.rows) if table else []
+
+        profile_rows = _rows(profile_resp)
+        topics_rows = _rows(topics_resp)
+        diag_rows = _rows(diag_resp)
+
+        if not (profile_rows or topics_rows or diag_rows):
+            result.error = "F10 数据为空"
+            result.score = 0
+            return result
+
+        result.success = True
+        result.parsed = {
+            "code": code6,
+            "profile": profile_rows[0] if profile_rows else {},
+            "hot_topics": topics_rows[:5],
+            "finance_diagnosis": diag_rows[0] if diag_rows else {},
+            "_source": "eltdx",
+        }
+        return cls._score(result)
+
+    @classmethod
+    def _score(cls, result: DataSourceResult) -> DataSourceResult:
+        """eltdx 评分：连通性、响应速度、数据完整性"""
+        result.availability_score = 100 if result.success else 0
+
+        rt = result.response_time_ms
+        if rt <= 200: result.timeliness_score = 100
+        elif rt <= 500: result.timeliness_score = 90
+        elif rt <= 1000: result.timeliness_score = 80
+        elif rt <= 2000: result.timeliness_score = 60
+        elif rt <= 5000: result.timeliness_score = 40
+        else: result.timeliness_score = 20
+
+        if result.success and result.parsed:
+            parsed = result.parsed
+            if isinstance(parsed, list):
+                has_data = len(parsed) > 0 and parsed[0].get("price") is not None
+            elif isinstance(parsed, dict):
+                has_data = bool(
+                    parsed.get("bars") or parsed.get("points") or parsed.get("ticks")
+                    or parsed.get("profile")
+                )
+            else:
+                has_data = len(str(parsed)) > 20
+            result.quality_score = 95 if has_data else 50
+        else:
+            result.quality_score = 0
+
+        result.score = (
+            result.availability_score * 0.40 +
+            result.timeliness_score * 0.30 +
+            result.quality_score * 0.30
+        )
+        return result
+
+
 # ============================================================
 # 路由核心逻辑
 # ============================================================
@@ -527,7 +860,7 @@ def cmd_health():
         all_results["wind"] = dummy
 
     # 3. 检测ftshare
-    print("\n[3/3] 检测FTShare公告...")
+    print("\n[3/4] 检测FTShare公告...")
     if FtShareAdapter._is_available():
         ft_result = FtShareAdapter.fetch("600519.SH", timeout=TIMEOUTS["ftshare"])
         all_results["ftshare"] = ft_result
@@ -538,6 +871,19 @@ def cmd_health():
         dummy.error = "未安装"
         dummy.score = 0
         all_results["ftshare"] = dummy
+
+    # 4. 检测 eltdx
+    print("\n[4/4] 检测eltdx通达信协议...")
+    if EltdxAdapter._is_available():
+        el_result = EltdxAdapter.fetch("quote", "sh600519", timeout=TIMEOUTS.get("eltdx", 10))
+        all_results["eltdx"] = el_result
+        _print_source_result(el_result)
+    else:
+        print("  [!] eltdx 包未安装（pip install eltdx）")
+        dummy = DataSourceResult("eltdx", "quote")
+        dummy.error = "未安装"
+        dummy.score = 0
+        all_results["eltdx"] = dummy
 
     # 汇总
     print("\n" + "=" * 65)
@@ -690,6 +1036,58 @@ def cmd_compare(code: str, data_type: str = "quote"):
             print(f"  {sources_list[0]}: {p1} vs {sources_list[1]}: {p2} -> 差异 {diff_abs:.2f} ({diff_pct:.2f}%) {status}")
 
 
+def _eltdx_cmd_common(data_type: str, code: str, output_json: bool, extra: dict | None = None):
+    """eltdx 各命令的公共输出逻辑"""
+    result = EltdxAdapter.fetch(data_type, code, **(extra or {}))
+
+    if output_json:
+        output = {
+            "timestamp": datetime.now().isoformat(),
+            "source": "eltdx",
+            "data_type": data_type,
+            "code": code,
+            "result": result.to_dict(),
+        }
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        return
+
+    grade = _score_to_grade(result.score)
+    status = "OK" if result.success and result.score >= 50 else "WARN" if result.score >= 20 else "FAIL"
+    print(f"[{status}] eltdx {data_type} {code} | 评分 {result.score:.1f} ({grade}级) | 响应 {result.response_time_ms}ms")
+    if result.error:
+        print(f"  错误: {result.error}")
+    if result.success and result.parsed:
+        print(json.dumps(result.parsed, ensure_ascii=False, indent=2)[:800])
+        if len(json.dumps(result.parsed, ensure_ascii=False)) > 800:
+            print("  ... (JSON 输出已截断，使用 --json 查看完整数据)")
+
+
+def cmd_kline(code: str = "600519", period: str = "day", count: int = 100, output_json: bool = False):
+    """获取 eltdx K线数据"""
+    _eltdx_cmd_common("kline", code, output_json, {"period": period, "count": count})
+
+
+def cmd_minute(code: str = "600519", output_json: bool = False):
+    """获取 eltdx 当日分时数据"""
+    _eltdx_cmd_common("minute", code, output_json)
+
+
+def cmd_auction(code: str = "600519", output_json: bool = False):
+    """获取 eltdx 集合竞价数据"""
+    _eltdx_cmd_common("auction", code, output_json)
+
+
+def cmd_tick(code: str = "600519", date: str | None = None, count: int = 2000, output_json: bool = False):
+    """获取 eltdx 逐笔成交数据"""
+    date = date or datetime.now().strftime("%Y%m%d")
+    _eltdx_cmd_common("tick", code, output_json, {"date": date, "count": count})
+
+
+def cmd_f10(code: str = "600519", output_json: bool = False):
+    """获取 eltdx F10 资料"""
+    _eltdx_cmd_common("f10", code, output_json)
+
+
 # ============================================================
 # 输出辅助
 # ============================================================
@@ -770,9 +1168,100 @@ def main():
                 i += 1
         cmd_compare(code, dtype)
 
+    elif args[0] == "kline":
+        code = "600519"
+        period = "day"
+        count = 100
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] in ("--period", "-p") and i + 1 < len(args):
+                period = args[i + 1]
+                i += 2
+            elif args[i] in ("--count", "-n") and i + 1 < len(args):
+                count = int(args[i + 1])
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_kline(code, period, count, output_json)
+
+    elif args[0] == "minute":
+        code = "600519"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_minute(code, output_json)
+
+    elif args[0] == "auction":
+        code = "600519"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_auction(code, output_json)
+
+    elif args[0] == "tick":
+        code = "600519"
+        date = datetime.now().strftime("%Y%m%d")
+        count = 2000
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] in ("--date", "-d") and i + 1 < len(args):
+                date = args[i + 1]
+                i += 2
+            elif args[i] in ("--count", "-n") and i + 1 < len(args):
+                count = int(args[i + 1])
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_tick(code, date, count, output_json)
+
+    elif args[0] == "f10":
+        code = "600519"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_f10(code, output_json)
+
     else:
         print(f"未知命令: {args[0]}")
-        print("用法: python data_router.py [health|quote|watchlist|compare] [--json]")
+        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10] [--json]")
         sys.exit(1)
 
 
