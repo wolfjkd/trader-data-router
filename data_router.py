@@ -322,8 +322,8 @@ class FtShareAdapter:
     NAME = "ftshare"
     DESCRIPTION = "FTShare公告数据（A股公告结构化）"
 
-    # ftshare目录（自动检测：从data_router.py位置向上查找 .workbuddy/skills/ftshare-announcement-data）
-    FTSHARE_DIR = Path(__file__).parent.parent.parent / ".workbuddy" / "skills" / "ftshare-announcement-data"
+    # ftshare目录（自动检测：从workbuddy skills目录查找）
+    FTSHARE_DIR = Path(__file__).parent.parent.parent / "skills" / "ftshare-announcement-data"
 
     @classmethod
     def _is_available(cls) -> bool:
