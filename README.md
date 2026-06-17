@@ -1,30 +1,29 @@
 # trader-data-router
 
 <p align="center">
-  <strong>A股数据获取体系 + 多源智能路由</strong><br>
-  <i>零依赖 · 自动故障切换 · 开箱即用</i>
+  <strong>A股数据获取体系 + 数据源检测</strong><br>
+  <i>多源数据 · 健康评分 · 择优输出</i>
 </p>
 
 ---
 
 ## ✨ 这是什么？
 
-**trader-data-router** 是一个面向A股交易员的完整数据获取解决方案，核心亮点：
+**trader-data-router** 是一个面向 A股交易员的数据获取 CLI 工具，提供统一入口查询多个数据源，并对数据源做健康检测和评分。
 
 | 能力 | 说明 |
 |------|------|
-| 📊 **5大数据源** | 腾讯实时行情、ftshare公告、Wind深度数据、AkShare、WebSearch |
-| 🔄 **智能路由** | `data_router.py` — 自动探测所有数据源健康状态，评分择优 |
-| ⚡ **毫秒级响应** | 腾讯行情接口 <200ms，并行多线程探测 |
-| 🔌 **零依赖** | data_router.py 仅用Python标准库，无需pip install任何包 |
-| 🛡️ **自动容错** | 某个源挂了自动切到下一个，报告标注来源和评分 |
+| 📊 **多数据源** | 腾讯实时行情、Wind 深度数据、ftshare 公告、eltdx 通达信协议 |
+| 🔄 **数据源检测** | `data_router.py health` 自动探测数据源可用性并评分 |
+| ⚡ **并行探测** | 多线程同时请求多个数据源 |
+| 🛡️ **故障降级** | 某个源异常时，报告会标注状态并给出可用备选 |
 
 ### 核心架构
 
 ```
-请求 → 并行探测(腾讯 + Wind + ftshare) → 评分排序 → 选最优
+请求 → 并行探测(腾讯 + Wind + ftshare + eltdx) → 评分排序 → 输出结果
                                               ↓
-                                    某源挂了？自动降级到备选
+                                    某源异常？标注状态并继续
 ```
 
 ## 🚀 快速开始（3步）
@@ -87,6 +86,13 @@ python data_router.py quote --codes sh600519 --json
 
 # 多源对比
 python data_router.py compare --code 600519.SH --type quote
+
+# eltdx 通达信数据源（K线/分时/集合竞价/逐笔/F10）
+python data_router.py kline --code 601868 --period day --count 100
+python data_router.py minute --code 601868
+python data_router.py auction --code 601868
+python data_router.py tick --code 601868 --date 20260617 --count 1000
+python data_router.py f10 --code 601868
 ```
 
 ## 📁 文件说明
@@ -94,7 +100,7 @@ python data_router.py compare --code 600519.SH --type quote
 | 文件 | 用途 |
 |------|------|
 | `SKILL.md` | 完整文档：数据源配置、API速查表、部署步骤、故障排除 |
-| `data_router.py` | 多源智能路由脚本（~795行），核心执行文件 |
+| `data_router.py` | 多源数据路由脚本（核心执行文件） |
 | `README.md` | 本文件，项目介绍和快速上手 |
 
 ## ⚙️ 配置你的自选股
@@ -115,8 +121,12 @@ WATCHLIST = [
 
 | 数据类型 | 免费源 | 付费增强源 |
 |---------|--------|-----------|
-| 实时行情快照 | ✅ 腾讯接口 (毫秒级) | Wind (字段更丰富) |
-| 历史K线 | AkShare (腾讯源) | Wind (质量更高) |
+| 实时行情快照 | ✅ 腾讯接口 | Wind (字段更丰富) / eltdx |
+| 历史K线 | ✅ eltdx 通达信协议 | Wind (质量更高) |
+| 分时数据 | ✅ eltdx 通达信协议 | - |
+| 集合竞价 | ✅ eltdx 通达信协议 | - |
+| 逐笔成交 | ✅ eltdx 通达信协议 | - |
+| F10 公司资料 | ✅ eltdx 通达信协议 | Wind |
 | A股公告 | ✅ ftshare (结构化) | Wind RAG (语义搜索) |
 | 财经新闻 | WebSearch | Wind RAG |
 | 财务报表/ROE | - | ✅ Wind |
@@ -126,19 +136,19 @@ WATCHLIST = [
 | 大宗商品(金/银/油) | ✅ 腾讯接口 | - |
 | 美股指数 | ✅ 腾讯接口 | Wind global_stock |
 
-> 💡 **免费模式**：仅使用腾讯+ftshare+WebSearch，已覆盖80%的日常需求。Wind是可选增强。
+> 💡 **免费模式**：腾讯 + ftshare + eltdx 已覆盖日常行情、公告、K线、分时、竞价、逐笔需求。Wind 是可选增强。
 
-## 🔄 智能路由评分模型
+## 🔄 数据源评分模型
 
 每次查询都会对数据源进行三维打分：
 
 | 维度 | 权重 | 说明 |
 |------|------|------|
 | 可用性 | 40% | 连通且有有效数据 = 100分 |
-| 及时性 | 25-30% | 腾讯<500ms满分，Wind<1.5s满分 |
+| 及时性 | 25-30% | 腾讯<500ms满分，Wind<1.5s满分，eltdx<500ms满分 |
 | 质量 | 30-35% | 数据完整度 + 数值合理性 |
 
-**等级**：A≥85 / B≥70 / C≥50 / D<50（D级自动弃用）
+**等级**：A≥85 / B≥70 / C≥50 / D<50（D级视为不可用）
 
 ## 🔧 进阶配置
 
@@ -227,6 +237,7 @@ for stock in data['data']:
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v3.4.0 | 2026-06-17 | 集成 eltdx 通达信数据源；新增 5 个 CLI 命令：`kline`/`minute`/`auction`/`tick`/`f10`；health 检测加入 eltdx；FTShare 路径 bug 修复 |
 | v3.1 | 2026-06-01 | 更名 trader-data-router；东财适配器重构（datacenter端点，4/4可用）；集成全市场分析引擎（NewsFetcher+THSDataFetcher+MarketModels）；联动 trader-finance-hub 开源项目 |
 | v3.0 | 2026-05-22 | 新增 data_router.py 多源智能路由 |
 | v2.0 | 2026-05-22 | 整合Wind万得金融8大能力 |
@@ -242,6 +253,7 @@ MIT License — 自由使用、修改、分发。
 - [Wind万得金融](https://www.wind.com.cn/) — 专业金融数据
 - [ftshare-announcement-data](https://clawhub.ai) — A股公告数据
 - [AkShare](https://akshare.akfamily.xyz/) — Python财经数据接口库
+- [eltdx](https://github.com/electkismet/eltdx) — 通达信私有协议 Python 客户端
 
 ---
 
