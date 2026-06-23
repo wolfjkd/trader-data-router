@@ -1186,6 +1186,89 @@ def cmd_industry(code: str = "", top_n: int = 20, output_json: bool = False):
         print(f"[FAIL] 获取行业对比失败: {e}")
 
 
+def cmd_etf(top_n: int = 30, sort_by: str = "成交额", output_json: bool = False):
+    """获取 ETF 实时行情（AKShare fund_etf_spot_em）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_etf_realtime_json(top_n, sort_by)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            etfs = astock.get_etf_realtime(top_n, sort_by)
+            print(f"{'代码':<10} {'名称':<12} {'最新价':>8} {'涨跌幅':>8} {'成交额':>14}")
+            print("-" * 60)
+            for e in etfs:
+                code = str(e.get("etf_code", ""))
+                name = str(e.get("name", ""))[:10]
+                price = e.get("price", "-")
+                chg = e.get("change_pct", "-")
+                amt = e.get("amount", "-")
+                price_s = f"{price:.3f}" if isinstance(price, (int, float)) else "-"
+                chg_s = f"{chg:+.2f}%" if isinstance(chg, (int, float)) else "-"
+                amt_s = f"{amt:,.0f}" if isinstance(amt, (int, float)) else "-"
+                print(f"{code:<10} {name:<12} {price_s:>8} {chg_s:>8} {amt_s:>14}")
+    except Exception as e:
+        print(f"[FAIL] 获取ETF行情失败: {e}")
+
+
+def cmd_cb(top_n: int = 30, sort_by: str = "成交额", output_json: bool = False):
+    """获取可转债实时行情（AKShare bond_zh_cov）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_cb_realtime_json(top_n, sort_by)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            bonds = astock.get_cb_realtime(top_n, sort_by)
+            print(f"{'转债代码':<10} {'转债名称':<12} {'价格':>8} {'溢价率':>8} {'正股价':>8} {'评级':<6}")
+            print("-" * 60)
+            for b in bonds:
+                bc = str(b.get("bond_code", ""))
+                bn = str(b.get("bond_name", ""))[:10]
+                bp = b.get("bond_price", "-")
+                cp = b.get("conversion_premium", "-")
+                sp = b.get("stock_price", "-")
+                cr = str(b.get("credit_rating", ""))
+                bp_s = f"{bp:.2f}" if isinstance(bp, (int, float)) else "-"
+                cp_s = f"{cp:.2f}%" if isinstance(cp, (int, float)) else "-"
+                sp_s = f"{sp:.2f}" if isinstance(sp, (int, float)) else "-"
+                print(f"{bc:<10} {bn:<12} {bp_s:>8} {cp_s:>8} {sp_s:>8} {cr:<6}")
+    except Exception as e:
+        print(f"[FAIL] 获取可转债行情失败: {e}")
+
+
+def cmd_tick_store(code: str = "600519", trade_date: str = "", action: str = "list", output_json: bool = False):
+    """查看 tick 存储状态"""
+    try:
+        astock = _import_astock_signals()
+        store = astock.TickStore() if hasattr(astock, 'TickStore') else None
+        if store is None:
+            print("[FAIL] TickStore not available")
+            return
+
+        if action == "list":
+            stats = store.get_stats()
+            if output_json:
+                print(json.dumps(stats, ensure_ascii=False, indent=2))
+            else:
+                print(f"{'代码':<10} {'日期':<12} {'行数':>10} {'更新时间':<20}")
+                print("-" * 55)
+                for s in stats:
+                    print(f"{s['code']:<10} {s['trade_date']:<12} {s['row_count']:>10} {s['updated_at']:<20}")
+        elif action == "query" and trade_date:
+            df = store.load_tick(code, trade_date)
+            if df.empty:
+                print(f"无 {code}/{trade_date} 的 tick 数据")
+            else:
+                print(f"共 {len(df)} 条 tick 记录 ({code}/{trade_date})")
+                print(df.head(20).to_string(index=False))
+        else:
+            dates = store.list_dates(code)
+            print(f"{code} 已存储交易日: {dates}")
+    except Exception as e:
+        print(f"[FAIL] tick store 操作失败: {e}")
+
+
 # ============================================================
 # 输出辅助
 # ============================================================
@@ -1431,9 +1514,68 @@ def main():
                 i += 1
         cmd_industry(code, top_n, output_json)
 
+    elif args[0] == "etf":
+        top_n = 30
+        sort_by = "成交额"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--top", "-n") and i + 1 < len(args):
+                top_n = int(args[i + 1])
+                i += 2
+            elif args[i] in ("--sort", "-s") and i + 1 < len(args):
+                sort_by = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_etf(top_n, sort_by, output_json)
+
+    elif args[0] in ("cb", "bond", "convertible"):
+        top_n = 30
+        sort_by = "成交额"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--top", "-n") and i + 1 < len(args):
+                top_n = int(args[i + 1])
+                i += 2
+            elif args[i] in ("--sort", "-s") and i + 1 < len(args):
+                sort_by = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_cb(top_n, sort_by, output_json)
+
+    elif args[0] == "tickstore":
+        code = "600519"
+        trade_date = ""
+        action = "list"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] in ("--date", "-d") and i + 1 < len(args):
+                trade_date = args[i + 1]
+                action = "query"
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_tick_store(code, trade_date, action, output_json)
+
     else:
         print(f"未知命令: {args[0]}")
-        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry] [--json]")
+        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry|etf|cb|tickstore] [--json]")
         sys.exit(1)
 
 
