@@ -1,3 +1,7 @@
+---
+disable: true
+---
+
 # A股数据获取体系 - 快速部署指南
 > **Skill名称**：trader-data-router
 > **当前版本**：**v3.0**（2026-05-22）
@@ -35,7 +39,7 @@
 | 数据类型 | 接口地址 | 示例 |
 |---------|---------|------|
 | A股指数 | `https://qt.gtimg.cn/q=sh000001,sz399001,sz399006` | 上证/深证/创业板 |
-| 自选股 | `https://qt.gtimg.cn/q=sh600170,sh603077,sz000061` | 自定义股票列表 |
+| 自选股 | `https://qt.gtimg.cn/q=sh600170,sh603077,sh601868,sh601390` | 自定义股票列表 |
 | 美股指数 | `https://qt.gtimg.cn/q=usINDU,usIXIC,usINX` | 道指/纳斯达克/标普 |
 | 大宗商品 | `https://qt.gtimg.cn/q=hf_GC,hf_SI,hf_CL` | 黄金/白银/原油 |
 | 数字货币 | `https://qt.gtimg.cn/q=gb_BTCJPY` | 比特币等 |

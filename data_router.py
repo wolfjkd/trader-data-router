@@ -2,12 +2,12 @@
 """
 多源数据路由器 - A股交易数据获取
 =========================================
-版本: v3.4.0 (2026-06-17)
+版本: v3.5.0 (2026-06-23)
 Skill: trader-data-router
 作者: wolfjkd (MIT License)
 
 数据源自动检测、评分，支持并行探测和结果对比。
-核心依赖：Python标准库 + eltdx（通达信协议数据源，可选）。
+核心依赖：Python标准库 + eltdx（通达信协议数据源，可选）+ astock_signals（薄壳CLI命令）。
 
 使用方式:
   # 检测所有数据源健康状态
@@ -28,6 +28,13 @@ Skill: trader-data-router
   python data_router.py auction --code 600519
   python data_router.py tick --code 600519 --date 20260617 --count 1000
   python data_router.py f10 --code 600519
+
+  # 薄壳CLI命令（调用 astock_signals 模块，与 Hub 共用数据源）
+  python data_router.py fundflow --code 600519       # 个股资金流向
+  python data_router.py northbound                   # 北向资金流向
+  python data_router.py dragon --code 000858 --days 30  # 龙虎榜
+  python data_router.py concept --code 688017        # 概念板块归属
+  python data_router.py industry --top 20            # 行业横向对比
 
   # 仅输出JSON（供其他脚本调用）
   python data_router.py quote --codes sh000001 --json
@@ -1089,6 +1096,97 @@ def cmd_f10(code: str = "600519", output_json: bool = False):
 
 
 # ============================================================
+# 薄壳 CLI 命令（调用 trader-finance-hub astock_signals 模块）
+# 补齐铁律要求的 5 个缺失命令：资金流/北向/龙虎榜/概念/行业对比
+# ============================================================
+
+def _import_astock_signals():
+    """动态导入 astock_signals 模块（从 trader-finance-hub src/）"""
+    import importlib
+    hub_src = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "WorkBuddy", "Claw", "trader-finance-hub", "src")
+    )
+    # 备选路径
+    if not os.path.isdir(hub_src):
+        hub_src = os.path.normpath(
+            os.path.join(os.path.expanduser("~"), "WorkBuddy", "Claw", "trader-finance-hub", "src")
+        )
+    if hub_src not in sys.path:
+        sys.path.insert(0, hub_src)
+    return importlib.import_module("astock_signals")
+
+
+def cmd_fund_flow(code: str = "600519", output_json: bool = False):
+    """获取个股资金流向（东财 push2，astock_signals）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_fund_flow_json(code)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            text = astock.get_fund_flow(code)
+            print(text)
+    except Exception as e:
+        print(f"[FAIL] 获取资金流向失败: {e}")
+
+
+def cmd_northbound(output_json: bool = False):
+    """获取北向资金流向（同花顺 hsgtApi，astock_signals）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_northbound_flow_json(include_history=True)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            text = astock.get_northbound_flow(include_history=True)
+            print(text)
+    except Exception as e:
+        print(f"[FAIL] 获取北向资金失败: {e}")
+
+
+def cmd_dragon(code: str = "600519", look_back: int = 30, output_json: bool = False):
+    """获取龙虎榜数据（东财 datacenter，astock_signals）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_dragon_tiger_board_json(code, look_back_days=look_back)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            text = astock.get_dragon_tiger_board(code, look_back_days=look_back)
+            print(text)
+    except Exception as e:
+        print(f"[FAIL] 获取龙虎榜失败: {e}")
+
+
+def cmd_concept(code: str = "600519", output_json: bool = False):
+    """获取个股概念板块归属（东财+百度PAE，astock_signals）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_concept_blocks_json(code)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            text = astock.get_concept_blocks(code)
+            print(text)
+    except Exception as e:
+        print(f"[FAIL] 获取概念归属失败: {e}")
+
+
+def cmd_industry(code: str = "", top_n: int = 20, output_json: bool = False):
+    """获取行业横向对比排名（东财 push2，astock_signals）"""
+    try:
+        astock = _import_astock_signals()
+        if output_json:
+            result = astock.get_industry_comparison_json(code, top_n=top_n)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            text = astock.get_industry_comparison(code, top_n=top_n)
+            print(text)
+    except Exception as e:
+        print(f"[FAIL] 获取行业对比失败: {e}")
+
+
+# ============================================================
 # 输出辅助
 # ============================================================
 
@@ -1259,9 +1357,83 @@ def main():
                 i += 1
         cmd_f10(code, output_json)
 
+    # --- 薄壳 CLI 命令（astock_signals 模块） ---
+
+    elif args[0] == "fundflow":
+        code = "600519"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_fund_flow(code, output_json)
+
+    elif args[0] in ("northbound", "north"):
+        output_json = "--json" in args
+        cmd_northbound(output_json)
+
+    elif args[0] == "dragon":
+        code = "600519"
+        look_back = 30
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] in ("--days", "-d") and i + 1 < len(args):
+                look_back = int(args[i + 1])
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_dragon(code, look_back, output_json)
+
+    elif args[0] == "concept":
+        code = "600519"
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_concept(code, output_json)
+
+    elif args[0] == "industry":
+        code = ""
+        top_n = 20
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] in ("--top", "-n") and i + 1 < len(args):
+                top_n = int(args[i + 1])
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_industry(code, top_n, output_json)
+
     else:
         print(f"未知命令: {args[0]}")
-        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10] [--json]")
+        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry] [--json]")
         sys.exit(1)
 
 
