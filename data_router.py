@@ -72,6 +72,15 @@ INDEXES = ["sh000001", "sz399001", "sz399006"]
 # 美股指数
 US_INDEXES = ["usINDU", "usIXIC", "usINX"]
 
+# 亚洲市场指数（韩国、日本、港股）
+ASIA_INDEXES = [
+    ("int_kospi", "韩国KOSPI"),
+    ("int_nikkei225", "日经225"),
+    ("hkHSI", "恒生指数"),
+    ("hkHSTECH", "恒生科技"),
+    ("int_fta50", "富时A50期货"),
+]
+
 # 大宗商品
 COMMODITIES = ["hf_GC", "hf_SI", "hf_CL"]
 
@@ -239,8 +248,8 @@ class WindAdapter:
     NAME = "wind"
     DESCRIPTION = "Wind万得金融（全维度数据，有日额度）"
 
-    # Wind skill目录（自动检测：从data_router.py位置向上查找 .agents/skills/wind-mcp-skill）
-    WIND_SKILL_DIR = Path(__file__).parent.parent.parent.parent / ".agents" / "skills" / "wind-mcp-skill"
+    # Wind skill目录（自动检测：从data_router.py位置向上查找同级skills目录）
+    WIND_SKILL_DIR = Path(__file__).parent.parent / "wind-mcp-skill"
 
     @classmethod
     def _is_available(cls) -> bool:
@@ -268,7 +277,7 @@ class WindAdapter:
 
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout,
-                cwd=str(cls.WIND_SKILL_DIR)
+                cwd=str(cls.WIND_SKILL_DIR), encoding='utf-8', errors='replace'
             )
 
             result.response_time_ms = round((time.time() - start) * 1000)
@@ -337,8 +346,8 @@ class FtShareAdapter:
     NAME = "ftshare"
     DESCRIPTION = "FTShare公告数据（A股公告结构化）"
 
-    # ftshare目录（自动检测：从workbuddy skills目录查找）
-    FTSHARE_DIR = Path(__file__).parent.parent.parent / "skills" / "ftshare-announcement-data"
+    # ftshare目录（自动检测：从data_router.py位置向上查找同级skills目录）
+    FTSHARE_DIR = Path(__file__).parent.parent / "ftshare-announcement-data"
 
     @classmethod
     def _is_available(cls) -> bool:
@@ -847,14 +856,21 @@ def cmd_health():
 
     all_results = {}
 
-    # 1. 检测腾讯接口
-    print("\n[1/3] 检测腾讯行情接口...")
+    # 1. 检测腾讯接口（A股）
+    print("\n[1/4] 检测腾讯行情接口（A股）...")
     tencent_result = TencentAdapter.fetch(INDEXES, TIMEOUTS["tencent"])
     all_results["tencent"] = tencent_result
     _print_source_result(tencent_result)
 
-    # 2. 检测Wind
-    print("\n[2/3] 检测Wind万得...")
+    # 2. 检测腾讯接口（亚洲指数）
+    print("\n[2/4] 检测腾讯行情接口（亚洲指数）...")
+    asia_codes = [code for code, name in ASIA_INDEXES]
+    asia_result = TencentAdapter.fetch(asia_codes, TIMEOUTS["tencent"])
+    all_results["tencent_asia"] = asia_result
+    _print_source_result(asia_result)
+
+    # 3. 检测Wind
+    print("\n[3/5] 检测Wind万得...")
     if WindAdapter._is_available():
         wind_result = WindAdapter.fetch("600519.SH", timeout=TIMEOUTS["wind"])
         all_results["wind"] = wind_result
@@ -866,8 +882,8 @@ def cmd_health():
         dummy.score = 0
         all_results["wind"] = dummy
 
-    # 3. 检测ftshare
-    print("\n[3/4] 检测FTShare公告...")
+    # 4. 检测ftshare
+    print("\n[4/5] 检测FTShare公告...")
     if FtShareAdapter._is_available():
         ft_result = FtShareAdapter.fetch("600519.SH", timeout=TIMEOUTS["ftshare"])
         all_results["ftshare"] = ft_result
@@ -879,8 +895,8 @@ def cmd_health():
         dummy.score = 0
         all_results["ftshare"] = dummy
 
-    # 4. 检测 eltdx
-    print("\n[4/4] 检测eltdx通达信协议...")
+    # 5. 检测 eltdx
+    print("\n[5/5] 检测eltdx通达信协议...")
     if EltdxAdapter._is_available():
         el_result = EltdxAdapter.fetch("quote", "sh600519", timeout=TIMEOUTS.get("eltdx", 10))
         all_results["eltdx"] = el_result
@@ -1103,10 +1119,20 @@ def cmd_f10(code: str = "600519", output_json: bool = False):
 def _import_astock_signals():
     """动态导入 astock_signals 模块（从 trader-finance-hub src/）"""
     import importlib
+    # 优先: Documents/trae_projects/trader-finance-hub/src
     hub_src = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "WorkBuddy", "Claw", "trader-finance-hub", "src")
+        os.path.join(os.path.expanduser("~"), "Documents", "trae_projects", "trader-finance-hub", "src")
     )
-    # 备选路径
+    # 备选: .trae-cn 同层
+    if not os.path.isdir(hub_src):
+        hub_src = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "Documents", "trae_projects", "trader-finance-hub", "src")
+        )
+    # 旧路径兼容
+    if not os.path.isdir(hub_src):
+        hub_src = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "WorkBuddy", "Claw", "trader-finance-hub", "src")
+        )
     if not os.path.isdir(hub_src):
         hub_src = os.path.normpath(
             os.path.join(os.path.expanduser("~"), "WorkBuddy", "Claw", "trader-finance-hub", "src")
@@ -1267,6 +1293,96 @@ def cmd_tick_store(code: str = "600519", trade_date: str = "", action: str = "li
             print(f"{code} 已存储交易日: {dates}")
     except Exception as e:
         print(f"[FAIL] tick store 操作失败: {e}")
+
+
+def cmd_board(board_type: str = "zt", code: str = "", output_json: bool = False):
+    """获取涨停板数据（东财 push2ex + 同花顺涨停揭秘，astock_signals limit_up_board）
+
+    板类型:
+      zt     - 涨停池（连板数/封板时间/炸板次数）
+      zb     - 炸板池（振幅/涨速）
+      dt     - 跌停池（封单/连续跌停/开板次数）
+      prev_zt - 昨日涨停池（晋级率/赚钱效应）
+      insight - 涨停揭秘（题材原因/封板成功率/板型）
+      sentiment - 打板情绪速算（炸板率/连板梯队/晋级率）
+    """
+    try:
+        astock = _import_astock_signals()
+
+        if board_type == "sentiment":
+            if output_json:
+                result = astock.get_board_sentiment_json()
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                result = astock.calculate_board_sentiment()
+                print(f"打板情绪速算 ({result.get('calculated_at', '')})")
+                print("-" * 50)
+                print(f"  涨停: {result.get('zt_count', 0)} 家")
+                print(f"  炸板: {result.get('zb_count', 0)} 家")
+                print(f"  跌停: {result.get('dt_count', 0)} 家")
+                print(f"  炸板率: {result.get('break_rate', 0)}%")
+                print(f"  最高连板: {result.get('max_consecutive_limit_up', 0)} 连板")
+                if result.get('ladder'):
+                    print(f"  连板梯队: {result['ladder']}")
+                print(f"  昨日涨停晋级率: {result.get('prev_zt_promotion_rate', 0)}%")
+                print(f"  昨日涨停平均溢价: {result.get('prev_zt_avg_premium', 0)}%")
+                if result.get('top_themes'):
+                    print(f"\n  热门题材 TOP5:")
+                    for theme, count in list(result['top_themes'].items())[:5]:
+                        print(f"    {theme}: {count} 只")
+
+        elif board_type == "insight":
+            if output_json:
+                result = astock.get_limit_up_insight(code)
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                result = astock.get_limit_up_insight(code)
+                data = result.get("data", [])
+                print(f"涨停揭秘 ({result.get('count', 0)} 条)")
+                print("-" * 65)
+                print(f"{'代码':<8} {'名称':<10} {'涨幅':>8} {'题材原因':<30} {'封板率':>8} {'板型':<8}")
+                print("-" * 65)
+                for item in data[:20]:
+                    reason = item.get("reason", "")[:28]
+                    print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('change_pct', ''):>8} {reason:<30} {item.get('seal_success_rate', ''):>8} {item.get('board_type', ''):<8}")
+
+        else:
+            if output_json:
+                result = astock.get_limit_up_board_json(board_type)
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                result = astock.get_limit_up_board_json(board_type)
+                data = result.get("data", [])
+                type_names = {"zt": "涨停池", "zb": "炸板池", "dt": "跌停池", "prev_zt": "昨日涨停池"}
+                print(f"{type_names.get(board_type, board_type)} ({len(data)} 只)")
+                print("-" * 65)
+
+                if board_type == "zt":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'涨幅':>6} {'连板':>6} {'封板时间':>10} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('limit_up_count', ''):>6} {item.get('seal_time', ''):>10} {item.get('industry', '')[:10]:<12}")
+
+                elif board_type == "zb":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'涨幅':>6} {'振幅':>6} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('amplitude', ''):>6}% {item.get('industry', '')[:10]:<12}")
+
+                elif board_type == "dt":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'跌幅':>6} {'连跌停':>6} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('limit_down_count', ''):>6} {item.get('industry', '')[:10]:<12}")
+
+                elif board_type == "prev_zt":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'涨幅':>6} {'开盘':>6} {'最高':>6} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('open_pct', ''):>6}% {item.get('high_pct', ''):>6}% {item.get('industry', '')[:10]:<12}")
+
+    except Exception as e:
+        print(f"[FAIL] 获取涨停板数据失败: {e}")
 
 
 # ============================================================
@@ -1573,9 +1689,28 @@ def main():
                 i += 1
         cmd_tick_store(code, trade_date, action, output_json)
 
+    elif args[0] == "board":
+        board_type = "zt"
+        code = ""
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--type", "-t") and i + 1 < len(args):
+                board_type = args[i + 1]
+                i += 2
+            elif args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_board(board_type, code, output_json)
+
     else:
         print(f"未知命令: {args[0]}")
-        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry|etf|cb|tickstore] [--json]")
+        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry|etf|cb|tickstore|board] [--json]")
         sys.exit(1)
 
 

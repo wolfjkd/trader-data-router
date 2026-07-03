@@ -4,7 +4,7 @@ disable: true
 
 # A股数据获取体系 - 快速部署指南
 > **Skill名称**：trader-data-router
-> **当前版本**：**v3.0**（2026-05-22）
+> **当前版本**：**v3.1**（2026-07-02）
 > **作者**：wolfjkd
 > **开源协议**：MIT
 
@@ -294,6 +294,30 @@ python data_router.py health                              # 健康检测
 python data_router.py quote --codes sh000001 --json        # 行情(JSON)
 python data_router.py watchlist --json                     # 自选股(JSON)
 python data_router.py compare --code 600519.SH --type quote # 多源对比
+python data_router.py board --type zt                     # 涨停板数据
+python data_router.py board --type sentiment              # 打板情绪速算
+```
+
+#### board 命令详解
+
+```bash
+# 涨停池（默认）
+python data_router.py board --type zt
+
+# 炸板池
+python data_router.py board --type zb
+
+# 跌停池
+python data_router.py board --type dt
+
+# 打板情绪速算（涨停数/炸板率/跌停数/热门主题）
+python data_router.py board --type sentiment
+
+# 涨停揭秘（同花顺数据源）
+python data_router.py board --type insight
+
+# JSON格式输出
+python data_router.py board --type zt --json
 ```
 
 ### 6.4 定时任务集成
@@ -435,10 +459,11 @@ python data_router.py health
 
 | 版本 | 日期 | 变更内容 |
 |------|------|---------|
+| **v3.1** | 2026-07-02 | 新增 `board` 命令：涨停板数据（zt/zb/dt）+ 打板情绪速算 + 同花顺涨停揭秘；集成 trader-finance-hub 的 limit_up_board 模块 |
 | **v3.0** | 2026-05-22 | 新增 `data_router.py` 多源智能路由；SKILL.md新增第6节；容错策略升级为智能路由模式 |
 | **v2.0** | 2026-05-22 | 整合Wind万得金融能力：8个server_type、速查表、分工对照表；架构从4列扩展为5列 |
 | **v1.0** | 2026-05-20 | 初始版本：腾讯接口+ftshare公告+WebSearch+AkShare数据源体系 |
 
 ---
 
-*本skill由 wolfjkd 开源维护，当前版本：**v3.0** | MIT License*
+*本skill由 wolfjkd 开源维护，当前版本：**v3.1** | MIT License*
