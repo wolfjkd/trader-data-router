@@ -237,6 +237,8 @@ for stock in data['data']:
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v3.6.0 | 2026-06-24 | 新增 `etf` / `cb`(可转债) / `tickstore` 命令，Router 扩展至 17 个命令；数据源路由增强 |
+| v3.5.0 | 2026-06-24 | 补齐 5 个薄壳 CLI 命令（fundflow / northbound / dragon / concept / industry 等），Router 从 9→14 个命令 |
 | v3.4.0 | 2026-06-17 | 集成 eltdx 通达信数据源；新增 5 个 CLI 命令：`kline`/`minute`/`auction`/`tick`/`f10`；health 检测加入 eltdx；FTShare 路径 bug 修复 |
 | v3.1 | 2026-06-01 | 更名 trader-data-router；东财适配器重构（datacenter端点，4/4可用）；集成全市场分析引擎（NewsFetcher+THSDataFetcher+MarketModels）；联动 trader-finance-hub 开源项目 |
 | v3.0 | 2026-05-22 | 新增 data_router.py 多源智能路由 |

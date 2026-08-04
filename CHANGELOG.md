@@ -4,6 +4,23 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [3.6.0] - 2026-06-24
+
+### Added
+- 新增 3 个 CLI 命令：`etf`（ETF 数据）、`cb`/`bond`/`convertible`（可转债数据）、`tickstore`（逐笔成交存储）。
+- Router 命令总数扩展至 17 个。
+
+### Changed
+- `data_router.py` 头部版本号更新为 `v3.6.0`。
+
+## [3.5.0] - 2026-06-24
+
+### Added
+- 补齐 5 个薄壳 CLI 命令（fundflow / northbound / dragon / concept / industry 等），Router 命令数从 9 扩展到 14。
+
+### Changed
+- `data_router.py` 头部版本号更新为 `v3.5.0`。
+
 ## [3.4.0] - 2026-06-17
 
 ### Added
