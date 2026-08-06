@@ -4,6 +4,15 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [3.7.0] - 2026-08-06
+
+### Added
+- 新增 `board` 命令（涨停板速报）：涨停池 / 炸板池 / 跌停池 / 昨日涨停池 / 涨停揭秘 / 打板情绪速算，调用 `astock_signals.limit_up_board`。
+- Router 命令总数扩展至 18 个。
+
+### Changed
+- `data_router.py` 头部版本号更新为 `v3.7.0`。
+
 ## [3.6.0] - 2026-06-24
 
 ### Added

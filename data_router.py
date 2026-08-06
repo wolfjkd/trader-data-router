@@ -2,7 +2,7 @@
 """
 多源数据路由器 - A股交易数据获取
 =========================================
-版本: v3.6.0 (2026-06-24)
+版本: v3.7.0 (2026-08-06)
 Skill: trader-data-router
 作者: wolfjkd (MIT License)
 
@@ -1270,6 +1270,100 @@ def cmd_tick_store(code: str = "600519", trade_date: str = "", action: str = "li
 
 
 # ============================================================
+# 涨停板命令（v3.7.0 移植：调用 astock_signals limit_up_board）
+# ============================================================
+
+def cmd_board(board_type: str = "zt", code: str = "", output_json: bool = False):
+    """获取涨停板数据（东财 push2ex + 同花顺涨停揭秘，astock_signals limit_up_board）
+
+    板类型:
+      zt     - 涨停池（连板数/封板时间/炸板次数）
+      zb     - 炸板池（振幅/涨速）
+      dt     - 跌停池（封单/连续跌停/开板次数）
+      prev_zt - 昨日涨停池（晋级率/赚钱效应）
+      insight - 涨停揭秘（题材原因/封板成功率/板型）
+      sentiment - 打板情绪速算（炸板率/连板梯队/晋级率）
+    """
+    try:
+        astock = _import_astock_signals()
+
+        if board_type == "sentiment":
+            if output_json:
+                result = astock.get_board_sentiment_json()
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                result = astock.calculate_board_sentiment()
+                print(f"打板情绪速算 ({result.get('calculated_at', '')})")
+                print("-" * 50)
+                print(f"  涨停: {result.get('zt_count', 0)} 家")
+                print(f"  炸板: {result.get('zb_count', 0)} 家")
+                print(f"  跌停: {result.get('dt_count', 0)} 家")
+                print(f"  炸板率: {result.get('break_rate', 0)}%")
+                print(f"  最高连板: {result.get('max_consecutive_limit_up', 0)} 连板")
+                if result.get('ladder'):
+                    print(f"  连板梯队: {result['ladder']}")
+                print(f"  昨日涨停晋级率: {result.get('prev_zt_promotion_rate', 0)}%")
+                print(f"  昨日涨停平均溢价: {result.get('prev_zt_avg_premium', 0)}%")
+                if result.get('top_themes'):
+                    print(f"\n  热门题材 TOP5:")
+                    for theme, count in list(result['top_themes'].items())[:5]:
+                        print(f"    {theme}: {count} 只")
+
+        elif board_type == "insight":
+            if output_json:
+                result = astock.get_limit_up_insight(code)
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                result = astock.get_limit_up_insight(code)
+                data = result.get("data", [])
+                print(f"涨停揭秘 ({result.get('count', 0)} 条)")
+                print("-" * 65)
+                print(f"{'代码':<8} {'名称':<10} {'涨幅':>8} {'题材原因':<30} {'封板率':>8} {'板型':<8}")
+                print("-" * 65)
+                for item in data[:20]:
+                    reason = item.get("reason", "")[:28]
+                    print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('change_pct', ''):>8} {reason:<30} {item.get('seal_success_rate', ''):>8} {item.get('board_type', ''):<8}")
+
+        else:
+            if output_json:
+                result = astock.get_limit_up_board_json(board_type)
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+            else:
+                result = astock.get_limit_up_board_json(board_type)
+                data = result.get("data", [])
+                type_names = {"zt": "涨停池", "zb": "炸板池", "dt": "跌停池", "prev_zt": "昨日涨停池"}
+                print(f"{type_names.get(board_type, board_type)} ({len(data)} 只)")
+                print("-" * 65)
+
+                if board_type == "zt":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'涨幅':>6} {'连板':>6} {'封板时间':>10} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('limit_up_count', ''):>6} {item.get('seal_time', ''):>10} {item.get('industry', '')[:10]:<12}")
+
+                elif board_type == "zb":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'涨幅':>6} {'振幅':>6} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('amplitude', ''):>6}% {item.get('industry', '')[:10]:<12}")
+
+                elif board_type == "dt":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'跌幅':>6} {'连跌停':>6} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('limit_down_count', ''):>6} {item.get('industry', '')[:10]:<12}")
+
+                elif board_type == "prev_zt":
+                    print(f"{'代码':<8} {'名称':<10} {'价格':>8} {'涨幅':>6} {'开盘':>6} {'最高':>6} {'行业':<12}")
+                    print("-" * 65)
+                    for item in data[:20]:
+                        print(f"{item.get('code', ''):<8} {item.get('name', ''):<10} {item.get('price', ''):>8} {item.get('change_pct', ''):>6}% {item.get('open_pct', ''):>6}% {item.get('high_pct', ''):>6}% {item.get('industry', '')[:10]:<12}")
+
+    except Exception as e:
+        print(f"[FAIL] 获取涨停板数据失败: {e}")
+
+
+# ============================================================
 # 输出辅助
 # ============================================================
 
@@ -1573,9 +1667,28 @@ def main():
                 i += 1
         cmd_tick_store(code, trade_date, action, output_json)
 
+    elif args[0] == "board":
+        board_type = "zt"
+        code = ""
+        output_json = False
+        i = 1
+        while i < len(args):
+            if args[i] in ("--type", "-t") and i + 1 < len(args):
+                board_type = args[i + 1]
+                i += 2
+            elif args[i] in ("--code", "-c") and i + 1 < len(args):
+                code = args[i + 1]
+                i += 2
+            elif args[i] == "--json":
+                output_json = True
+                i += 1
+            else:
+                i += 1
+        cmd_board(board_type, code, output_json)
+
     else:
         print(f"未知命令: {args[0]}")
-        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry|etf|cb|tickstore] [--json]")
+        print("用法: python data_router.py [health|quote|watchlist|compare|kline|minute|auction|tick|f10|fundflow|northbound|dragon|concept|industry|etf|cb|tickstore|board] [--json]")
         sys.exit(1)
 
 
