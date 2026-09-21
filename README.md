@@ -46,7 +46,7 @@ python data_router.py compare --code 600519.SH --type quote
 | Python 3.10+ | 必装 | 核心脚本运行环境 |
 | 腾讯财经接口 | 无需安装 | 国内直连 `qt.gtimg.cn` |
 | **eltdx**（可选但推荐） | `pip install eltdx` | 通达信私有协议 K线/分时/逐笔/F10 |
-| **tradex-hub**（可选，推荐装） | 见下 | 提供 astsignals 深度命令行（资金流/龙虎榜/行业/概念/ETF/可转债/涨停板） |
+| **tradex-hub**（可选，推荐装） | 见下 | 提供 astock_signals 深度命令行（资金流/龙虎榜/行业/概念/ETF/可转债/涨停板） |
 
 > **astock_signals 数据来源**：`fundflow`/`northbound`/`dragon`/`concept`/`industry`/`etf`/`cb`/`tickstore`/`board` 这些命令复用 tradex-hub 的 `astock_signals` 模块。需安装 tradex-hub 或将 `tradex-hub/tradex/src` 加入 `PYTHONPATH`；若未安装，这些命令会报 `未找到 astock_signals`。详见 [SKILL.md](./SKILL.md)。
 
