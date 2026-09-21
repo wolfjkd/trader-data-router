@@ -4,6 +4,15 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [未发布] - 2026-09-21（归档修复）
+
+**项目已归档，停止功能更新**（能力由 tradex-hub 取代）。
+
+### Changed
+- 修复 `data_router.py` 的数据源导入断链：astock_signals 路径由已失效的 `trader-finance-hub/src` 更新为 `tradex-hub/tradex/src`（多候选路径探测 + 清晰报错）。此前依赖 astock_signals 的 9 个命令（fundflow/northbound/dragon/concept/industry/etf/cb/tickstore/board）全部报 `No module named 'astock_signals'`。
+- 修复 SKILL.md 与 README.md 中旧名 `trader-finance-hub` 的残留引用。
+- README 重写：标明项目已归档、如实列出数据源可用性注意（东财 push2 风控所致 RemoteDisconnected、Wind 订阅等）。
+
 ## [3.7.0] - 2026-08-06
 
 ### Added

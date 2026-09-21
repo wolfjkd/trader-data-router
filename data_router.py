@@ -70,7 +70,7 @@ WATCHLIST = [
 INDEXES = ["sh000001", "sz399001", "sz399006"]
 
 # 美股指数
-US_INDEXES = ["usINDU", "usIXIC", "usINX"]
+US_INDEXES = ["usDJI", "usIXIC", "usINX"]
 
 # 大宗商品
 COMMODITIES = ["hf_GC", "hf_SI", "hf_CL"]
@@ -1096,20 +1096,37 @@ def cmd_f10(code: str = "600519", output_json: bool = False):
 
 
 # ============================================================
-# 薄壳 CLI 命令（调用 trader-finance-hub astock_signals 模块）
+# 薄壳 CLI 命令（调用 tradex-hub 的 astock_signals 模块）
 # 补齐铁律要求的 5 个缺失命令：资金流/北向/龙虎榜/概念/行业对比
 # ============================================================
 
 def _import_astock_signals():
-    """动态导入 astock_signals 模块（从 trader-finance-hub src/）"""
+    """动态导入 astock_signals 模块（来自 tradex-hub 的 tradex/src）。
+
+    注意：astock_signals 原独立仓库已于 2026-09-07 并入 tradex-hub，
+    唯一主源为 `tradex-hub/tradex/src/astock_signals`（v1.1.1+）。
+    旧路径 `trader-finance-hub/src`（2026-08-04 已改名 tradex-hub）已失效。
+    """
     import importlib
-    hub_src = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "WorkBuddy", "Claw", "trader-finance-hub", "src")
-    )
-    # 备选路径
-    if not os.path.isdir(hub_src):
-        hub_src = os.path.normpath(
-            os.path.join(os.path.expanduser("~"), "WorkBuddy", "Claw", "trader-finance-hub", "src")
+    # 候选路径（多方案探测，取第一个存在者）
+    candidates = [
+        # 本 skill 与 tradex-hub 同机（默认工作目录），按相对位置尝试
+        os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "WorkBuddy", "Claw", "tradex-hub", "tradex", "src")
+        ),
+        # 绝对路径（当前用户）
+        os.path.normpath(
+            os.path.join(os.path.expanduser("~"), "WorkBuddy", "Claw", "tradex-hub", "tradex", "src")
+        ),
+        # 已安装为包（pip -e 场景）
+        os.path.normpath(
+            os.path.join(os.path.expanduser("~"), "WorkBuddy", "Claw", "tradex-hub", "src")
+        ),
+    ]
+    hub_src = next((p for p in candidates if os.path.isdir(os.path.join(p, "astock_signals"))), None)
+    if hub_src is None:
+        raise RuntimeError(
+            "未找到 astock_signals（需安装 tradex-hub 或将 tradex/src 加入 PYTHONPATH）。"
         )
     if hub_src not in sys.path:
         sys.path.insert(0, hub_src)

@@ -1,6 +1,11 @@
 ---
-disable: true
+name: trader-data-router
+status: archived
+description: A股交易员数据获取体系的快速部署与多源智能路由方案——覆盖行情、公告、新闻、大宗商品、深度数据（财务/资金/板块/宏观/技术指标）的接口与容错降级路径。适用新机器部署、数据源容错、定时任务搭建、AI Agent 数据获取集成。触发词：A股数据获取、数据源路由、多源容错、trader-data-router、行情接口部署。
+archived_note: 已由 tradex-hub 取代，归档不再更新（2026-09-21）。
 ---
+
+> **⚠️ 已归档（2026-09-21）**：本 skill 的能力已由 **tradex-hub**（A股数据中台：SmartRouter 多源融合 + 健康评分 + 限流 + REST/MCP 双端点）完整覆盖并超越。本项目**停止维护**，不再新增数据源或功能。如有数据获取需求，请直接使用 tradex-hub；新增数据源请走 `tradex-add-datasource` 项目级 skill。本文件仅作为历史部署记录保留。
 
 # A股数据获取体系 - 快速部署指南
 > **Skill名称**：trader-data-router
@@ -40,7 +45,7 @@ disable: true
 |---------|---------|------|
 | A股指数 | `https://qt.gtimg.cn/q=sh000001,sz399001,sz399006` | 上证/深证/创业板 |
 | 自选股 | `https://qt.gtimg.cn/q=sh600170,sh603077,sh601868,sh601390` | 自定义股票列表 |
-| 美股指数 | `https://qt.gtimg.cn/q=usINDU,usIXIC,usINX` | 道指/纳斯达克/标普 |
+| 美股指数 | `https://qt.gtimg.cn/q=usDJI,usIXIC,usINX` | 道指/纳斯达克/标普 |
 | 大宗商品 | `https://qt.gtimg.cn/q=hf_GC,hf_SI,hf_CL` | 黄金/白银/原油 |
 | 数字货币 | `https://qt.gtimg.cn/q=gb_BTCJPY` | 比特币等 |
 
