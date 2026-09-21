@@ -1,6 +1,6 @@
 # trader-data-router
 
-> **⚠️ 已归档（2026-09-21）**：本项目已由 **tradex-hub**（A股数据中台）功能取代，**不再持续维护/更新**。本仓库作为 A股数据获取的历史 CLI 方案保留存档。新项目请使用 tradex-hub 或 `tradex-add-datasource` 项目级 skill。
+> **⚠️ 已归档（2026-09-21）**：本项目已由 **[tradex-hub](https://github.com/wolfjkd/tradex-hub)**（A股数据中台）功能取代，**不再持续维护/更新**。本仓库作为 A股数据获取的历史 CLI 方案保留存档。新项目请使用 [tradex-hub](https://github.com/wolfjkd/tradex-hub) 或 `tradex-add-datasource` 项目级 skill。
 
 <p align="center">
   <strong>A股轻量级多源数据获取 CLI</strong><br>
@@ -14,10 +14,10 @@
 **trader-data-router** 是一个面向 A股交易员的轻量数据获取命令行工具，提供：
 - 通过**腾讯直连接口**快速获取实时行情（毫秒级）
 - 通过 **eltdx 通达信协议**获取 K线/分时/集合竞价/逐笔/F10
-- 通过 **tradex-hub 的 astock_signals** 复用资金流、龙虎榜、行业、可转债、涨停板等深度数据
+- 通过 **[tradex-hub](https://github.com/wolfjkd/tradex-hub) 的 astock_signals** 复用资金流、龙虎榜、行业、可转债、涨停板等深度数据
 - **数据源健康检测与评分**，异常时自动标注并降级
 
-> **定位说明**：本项目是多源直连模式的 CLI 轻量方案。**tradex-hub**（同一作者出品的数据中台）提供了更完整的 SmartRouter 多源融合、自动健康分、限流防护、REST/MCP 双端点能力，且已包含本项目绝大部分数据能力。**除非你需要一个不依赖中台进程的裸 CLI，否则建议直接使用 tradex-hub。**
+> **定位说明**：本项目是多源直连模式的 CLI 轻量方案。**[tradex-hub](https://github.com/wolfjkd/tradex-hub)**（同一作者出品的数据中台）提供了更完整的 SmartRouter 多源融合、自动健康分、限流防护、REST/MCP 双端点能力，且已包含本项目绝大部分数据能力。**除非你需要一个不依赖中台进程的裸 CLI，否则建议直接使用 [tradex-hub](https://github.com/wolfjkd/tradex-hub)。**
 
 ## 快速开始
 
@@ -46,9 +46,9 @@ python data_router.py compare --code 600519.SH --type quote
 | Python 3.10+ | 必装 | 核心脚本运行环境 |
 | 腾讯财经接口 | 无需安装 | 国内直连 `qt.gtimg.cn` |
 | **eltdx**（可选但推荐） | `pip install eltdx` | 通达信私有协议 K线/分时/逐笔/F10 |
-| **tradex-hub**（可选，推荐装） | 见下 | 提供 astock_signals 深度命令行（资金流/龙虎榜/行业/概念/ETF/可转债/涨停板） |
+| **[tradex-hub](https://github.com/wolfjkd/tradex-hub)**（可选，推荐装） | 见下 | 提供 astock_signals 深度命令行（资金流/龙虎榜/行业/概念/ETF/可转债/涨停板） |
 
-> **astock_signals 数据来源**：`fundflow`/`northbound`/`dragon`/`concept`/`industry`/`etf`/`cb`/`tickstore`/`board` 这些命令复用 tradex-hub 的 `astock_signals` 模块。需安装 tradex-hub 或将 `tradex-hub/tradex/src` 加入 `PYTHONPATH`；若未安装，这些命令会报 `未找到 astock_signals`。详见 [SKILL.md](./SKILL.md)。
+> **astock_signals 数据来源**：`fundflow`/`northbound`/`dragon`/`concept`/`industry`/`etf`/`cb`/`tickstore`/`board` 这些命令复用 [tradex-hub](https://github.com/wolfjkd/tradex-hub) 的 `astock_signals` 模块。需安装 [tradex-hub](https://github.com/wolfjkd/tradex-hub) 或将 `tradex-hub/tradex/src` 加入 `PYTHONPATH`；若未安装，这些命令会报 `未找到 astock_signals`。详见 [SKILL.md](./SKILL.md)。
 
 ## 数据源覆盖矩阵
 
@@ -64,7 +64,7 @@ python data_router.py compare --code 600519.SH --type quote
 | 财经新闻 | WebSearch | Wind RAG |
 | 财务报表/ROE | - | ✅ Wind |
 | 技术指标(MACD) | - | ✅ Wind |
-| 资金流/龙虎榜/行业/概念 | ✅ astock_signals（需 tradex-hub） | Wind |
+| 资金流/龙虎榜/行业/概念 | ✅ astock_signals（需 [tradex-hub](https://github.com/wolfjkd/tradex-hub)） | Wind |
 | 涨停板速报 | ✅ astock_signals | - |
 | 大宗商品 | ✅ 腾讯接口 | - |
 | 美股指数 | ✅ 腾讯接口 | Wind global_stock |
@@ -137,7 +137,7 @@ MIT License — 自由使用、修改、分发。
 - [Wind万得金融](https://www.wind.com.cn/) — 专业金融数据
 - [AkShare](https://akshare.akfamily.xyz/) — Python 财经数据接口库
 - [eltdx](https://pypi.org/project/eltdx/) — 通达信私有协议客户端
-- **tradex-hub** — 本项目最重要的数据依赖（astock_signals 深度数据）
+- **[tradex-hub](https://github.com/wolfjkd/tradex-hub)** — 本项目最重要的数据依赖（astock_signals 深度数据）
 
 ---
 
